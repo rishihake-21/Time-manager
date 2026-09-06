@@ -1,19 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import AuthGuard from "../components/AuthGuard";
-import Header from "../components/Header";
-import ViewSwitcher from "../components/ViewSwitcher";
-import CategoryFilter from "../components/CategoryFilter";
-import DayView from "../components/DayView";
-import WeekView from "../components/WeekView";
-import MonthView from "../components/MonthView";
-import BlockModal from "../components/BlockModal";
-import { useAuth } from "../lib/useAuth";
-import { useSchedule } from "../lib/useSchedule";
-import { getBlocksForDate, getBlocksForRange } from "../lib/scheduleEngine";
-import { addDays, getMonthGrid, getWeekDates } from "../lib/dateUtils";
-
+import AuthGuard from "../../components/AuthGuard";
+import Header from "../../components/Header";
+import ViewSwitcher from "../../components/ViewSwitcher";
+import CategoryFilter from "../../components/CategoryFilter";
+import DayView from "../../components/DayView";
+import WeekView from "../../components/WeekView";
+import MonthView from "../../components/MonthView";
+import BlockModal from "../../components/BlockModal";
+import { useAuth } from "../../lib/useAuth";
+import { useSchedule } from "../../lib/useSchedule";
+import { getBlocksForDate, getBlocksForRange } from "../../lib/scheduleEngine";
+import { addDays, getMonthGrid, getWeekDates } from "../../lib/dateUtils";
 function DashboardContent() {
   const { user, signOut } = useAuth();
   const {
