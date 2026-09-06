@@ -30,7 +30,7 @@ export default function MonthView({ monthDates, currentMonthDate, today, blocksB
               onClick={() => onDayClick(date)}
               className={`flex h-16 flex-col items-start rounded-md border p-1.5 text-left transition-colors ${
                 inMonth ? "border-line bg-surface" : "border-transparent bg-transparent text-inkfaint/50"
-              } ${isToday ? "ring-2 ring-college" : ""}`}
+              } ${isToday ? "ring-2 ring-personal" : ""}`}
             >
               <span className={`text-xs font-medium ${inMonth ? "text-ink" : "text-inkfaint/50"}`}>
                 {date.getDate()}

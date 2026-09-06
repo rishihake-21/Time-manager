@@ -1,5 +1,5 @@
-// Minimal service worker: enables "Add to Home Screen" installability.
-// No request interception or caching.
+// Ledger service worker
+// No caching — all requests use the network.
 
 self.addEventListener("install", () => {
   self.skipWaiting();

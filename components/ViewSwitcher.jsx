@@ -21,7 +21,7 @@ export default function ViewSwitcher({ view, onChange }) {
           onClick={() => onChange(v.id)}
           className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
             view === v.id
-              ? "bg-ink text-paper"
+              ? "bg-college text-white"
               : "text-inkfaint hover:text-ink"
           }`}
         >

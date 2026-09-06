@@ -1,117 +1,194 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
+import { useMemo, useState } from "react";
+import AuthGuard from "../components/AuthGuard";
+import Header from "../components/Header";
+import ViewSwitcher from "../components/ViewSwitcher";
+import CategoryFilter from "../components/CategoryFilter";
+import DayView from "../components/DayView";
+import WeekView from "../components/WeekView";
+import MonthView from "../components/MonthView";
+import BlockModal from "../components/BlockModal";
+import { useAuth } from "../lib/useAuth";
+import { useSchedule } from "../lib/useSchedule";
+import { getBlocksForDate, getBlocksForRange } from "../lib/scheduleEngine";
+import { addDays, getMonthGrid, getWeekDates } from "../lib/dateUtils";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState("signin"); // "signin" | "signup"
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
+function DashboardContent() {
+  const { user, signOut } = useAuth();
+  const {
+    recurringBlocks,
+    exceptions,
+    completions,
+    loading,
+    addRecurringBlock,
+    updateRecurringBlock,
+    deleteRecurringBlock,
+    addException,
+    updateException,
+    deleteException,
+    cancelOccurrence,
+    toggleCompletion,
+  } = useSchedule(user?.id);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    setMessage(null);
+  const today = useMemo(() => new Date(), []);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [view, setView] = useState("day");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
-    if (mode === "signin") {
-      const { error: err } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (err) setError(err.message);
-      else router.push("/");
-    } else {
-      const { error: err } = await supabase.auth.signUp({ email, password });
-      if (err) setError(err.message);
-      else
-        setMessage(
-          "Account created. Check your inbox to confirm your email, then sign in."
-        );
-    }
-    setBusy(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState("create");
+  const [modalBlock, setModalBlock] = useState(null);
+  const [modalInitialDate, setModalInitialDate] = useState(today);
+
+  const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
+  const monthDates = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
+
+  function applyFilter(blocks) {
+    if (categoryFilter === "all") return blocks;
+    return blocks.filter((b) => b.category === categoryFilter);
+  }
+
+  const dayBlocks = useMemo(
+    () => applyFilter(getBlocksForDate(selectedDate, recurringBlocks, exceptions, completions)),
+    [selectedDate, recurringBlocks, exceptions, completions, categoryFilter]
+  );
+
+  const weekBlocksByDate = useMemo(() => {
+    const map = getBlocksForRange(weekDates, recurringBlocks, exceptions, completions);
+    for (const [key, blocks] of map) map.set(key, applyFilter(blocks));
+    return map;
+  }, [weekDates, recurringBlocks, exceptions, completions, categoryFilter]);
+
+  const monthBlocksByDate = useMemo(() => {
+    const map = getBlocksForRange(monthDates, recurringBlocks, exceptions, completions);
+    for (const [key, blocks] of map) map.set(key, applyFilter(blocks));
+    return map;
+  }, [monthDates, recurringBlocks, exceptions, completions, categoryFilter]);
+
+  function openCreate(date) {
+    setModalMode("create");
+    setModalInitialDate(date);
+    setModalBlock(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(block) {
+    setModalMode("edit");
+    setModalBlock(block);
+    setModalOpen(true);
+  }
+
+  function goToday() {
+    setSelectedDate(new Date());
+  }
+
+  function navigate(direction) {
+    if (view === "day") setSelectedDate((d) => addDays(d, direction));
+    else if (view === "week") setSelectedDate((d) => addDays(d, direction * 7));
+    else setSelectedDate((d) => new Date(d.getFullYear(), d.getMonth() + direction, 1));
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="font-display text-3xl font-semibold text-ink">
-          Ledger
-        </h1>
-        <p className="mt-1 text-sm text-inkfaint">
-          College and personal, on one page.
-        </p>
+    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      <Header today={today} selectedDate={selectedDate} onSignOut={signOut} />
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-ink">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink focus-visible:outline-none"
-              placeholder="you@college.edu"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-ink">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink focus-visible:outline-none"
-              placeholder="At least 6 characters"
-            />
-          </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <ViewSwitcher view={view} onChange={setView} />
+        <CategoryFilter value={categoryFilter} onChange={setCategoryFilter} />
+      </div>
 
-          {error && (
-            <p role="alert" className="text-sm text-danger">
-              {error}
-            </p>
-          )}
-          {message && <p className="text-sm text-college">{message}</p>}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-md bg-ink px-4 py-2 font-medium text-paper transition-opacity disabled:opacity-60"
-          >
-            {busy
-              ? "Please wait…"
-              : mode === "signin"
-              ? "Sign in"
-              : "Create account"}
-          </button>
-        </form>
-
+      <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setMessage(null);
-          }}
-          className="mt-4 text-sm text-inkfaint underline underline-offset-2"
+          onClick={() => navigate(-1)}
+          aria-label="Previous"
+          className="rounded-md border border-line px-2.5 py-1 text-sm text-inkfaint hover:text-ink"
         >
-          {mode === "signin"
-            ? "New here? Create an account"
-            : "Already have an account? Sign in"}
+          ←
+        </button>
+        <button
+          type="button"
+          onClick={goToday}
+          className="rounded-md border border-line px-3 py-1 text-sm text-inkfaint hover:text-ink"
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate(1)}
+          aria-label="Next"
+          className="rounded-md border border-line px-2.5 py-1 text-sm text-inkfaint hover:text-ink"
+        >
+          →
         </button>
       </div>
+
+      {loading ? (
+        <p className="mt-8 text-sm text-inkfaint">Loading your schedule…</p>
+      ) : (
+        <div className="mt-6">
+          {view === "day" && (
+            <DayView
+              date={selectedDate}
+              today={today}
+              blocks={dayBlocks}
+              onBlockClick={openEdit}
+              onAddClick={openCreate}
+              onToggleComplete={toggleCompletion}
+            />
+          )}
+          {view === "week" && (
+            <WeekView
+              weekDates={weekDates}
+              today={today}
+              blocksByDate={weekBlocksByDate}
+              onBlockClick={openEdit}
+              onDayClick={(date) => {
+                setSelectedDate(date);
+                setView("day");
+              }}
+              onAddClick={openCreate}
+              onToggleComplete={toggleCompletion}
+            />
+          )}
+          {view === "month" && (
+            <MonthView
+              monthDates={monthDates}
+              currentMonthDate={selectedDate}
+              today={today}
+              blocksByDate={monthBlocksByDate}
+              onDayClick={(date) => {
+                setSelectedDate(date);
+                setView("day");
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      <BlockModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        mode={modalMode}
+        initialDate={modalInitialDate}
+        block={modalBlock}
+        onCreateRecurring={addRecurringBlock}
+        onCreateException={addException}
+        onUpdateRecurring={updateRecurringBlock}
+        onUpdateException={updateException}
+        onDeleteRecurring={deleteRecurringBlock}
+        onDeleteException={deleteException}
+        onCancelOccurrence={cancelOccurrence}
+      />
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
   );
 }

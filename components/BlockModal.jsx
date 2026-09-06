@@ -127,8 +127,8 @@ export default function BlockModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-xl bg-surface p-5 shadow-lg sm:rounded-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-xl border border-line bg-surface p-5 shadow-lg sm:rounded-xl">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold text-ink">
             {mode === "create" ? "New block" : "Edit block"}
@@ -190,7 +190,7 @@ export default function BlockModal({
               required
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
-              className="mt-1 w-full rounded-md border border-line px-3 py-2"
+              className="mt-1 w-full rounded-md border border-line bg-surfaceRaised px-3 py-2 text-ink"
               placeholder="Data Structures Lecture"
             />
           </div>
@@ -206,7 +206,7 @@ export default function BlockModal({
                 required
                 value={form.start_time}
                 onChange={(e) => update("start_time", e.target.value)}
-                className="mt-1 w-full rounded-md border border-line px-3 py-2"
+                className="mt-1 w-full rounded-md border border-line bg-surfaceRaised px-3 py-2 text-ink"
               />
             </div>
             <div>
@@ -219,7 +219,7 @@ export default function BlockModal({
                 required
                 value={form.end_time}
                 onChange={(e) => update("end_time", e.target.value)}
-                className="mt-1 w-full rounded-md border border-line px-3 py-2"
+                className="mt-1 w-full rounded-md border border-line bg-surfaceRaised px-3 py-2 text-ink"
               />
             </div>
           </div>
@@ -232,7 +232,7 @@ export default function BlockModal({
               id="location"
               value={form.location}
               onChange={(e) => update("location", e.target.value)}
-              className="mt-1 w-full rounded-md border border-line px-3 py-2"
+              className="mt-1 w-full rounded-md border border-line bg-surfaceRaised px-3 py-2 text-ink"
               placeholder="Room 204"
             />
           </div>
@@ -246,7 +246,7 @@ export default function BlockModal({
               value={form.notes}
               onChange={(e) => update("notes", e.target.value)}
               rows={2}
-              className="mt-1 w-full rounded-md border border-line px-3 py-2"
+              className="mt-1 w-full rounded-md border border-line bg-surfaceRaised px-3 py-2 text-ink"
             />
           </div>
 
@@ -256,7 +256,7 @@ export default function BlockModal({
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-60"
+              className="rounded-md bg-college px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save"}
             </button>
