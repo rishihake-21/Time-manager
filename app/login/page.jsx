@@ -1,193 +1,184 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import AuthGuard from "../../components/AuthGuard";
-import Header from "../../components/Header";
-import ViewSwitcher from "../../components/ViewSwitcher";
-import CategoryFilter from "../../components/CategoryFilter";
-import DayView from "../../components/DayView";
-import WeekView from "../../components/WeekView";
-import MonthView from "../../components/MonthView";
-import BlockModal from "../../components/BlockModal";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/useAuth";
-import { useSchedule } from "../../lib/useSchedule";
-import { getBlocksForDate, getBlocksForRange } from "../../lib/scheduleEngine";
-import { addDays, getMonthGrid, getWeekDates } from "../../lib/dateUtils";
-function DashboardContent() {
-  const { user, signOut } = useAuth();
-  const {
-    recurringBlocks,
-    exceptions,
-    completions,
-    loading,
-    addRecurringBlock,
-    updateRecurringBlock,
-    deleteRecurringBlock,
-    addException,
-    updateException,
-    deleteException,
-    cancelOccurrence,
-    toggleCompletion,
-  } = useSchedule(user?.id);
+import { supabase } from "../../lib/supabaseClient";
 
-  const today = useMemo(() => new Date(), []);
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [view, setView] = useState("day");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+export default function LoginPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("create");
-  const [modalBlock, setModalBlock] = useState(null);
-  const [modalInitialDate, setModalInitialDate] = useState(today);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [infoMsg, setInfoMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
-  const monthDates = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
+  // If user is already logged in, redirect to dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/");
+    }
+  }, [user, authLoading, router]);
 
-  function applyFilter(blocks) {
-    if (categoryFilter === "all") return blocks;
-    return blocks.filter((b) => b.category === categoryFilter);
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setErrorMsg("");
+    setInfoMsg("");
+    setSubmitting(true);
+
+    try {
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+        } else if (data.user && !data.session) {
+          setInfoMsg("Account created! Please check your email to verify your account before logging in.");
+        } else if (data.session) {
+          router.replace("/");
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+        } else {
+          router.replace("/");
+        }
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      setErrorMsg("An unexpected error occurred. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  const dayBlocks = useMemo(
-    () => applyFilter(getBlocksForDate(selectedDate, recurringBlocks, exceptions, completions)),
-    [selectedDate, recurringBlocks, exceptions, completions, categoryFilter]
-  );
-
-  const weekBlocksByDate = useMemo(() => {
-    const map = getBlocksForRange(weekDates, recurringBlocks, exceptions, completions);
-    for (const [key, blocks] of map) map.set(key, applyFilter(blocks));
-    return map;
-  }, [weekDates, recurringBlocks, exceptions, completions, categoryFilter]);
-
-  const monthBlocksByDate = useMemo(() => {
-    const map = getBlocksForRange(monthDates, recurringBlocks, exceptions, completions);
-    for (const [key, blocks] of map) map.set(key, applyFilter(blocks));
-    return map;
-  }, [monthDates, recurringBlocks, exceptions, completions, categoryFilter]);
-
-  function openCreate(date) {
-    setModalMode("create");
-    setModalInitialDate(date);
-    setModalBlock(null);
-    setModalOpen(true);
-  }
-
-  function openEdit(block) {
-    setModalMode("edit");
-    setModalBlock(block);
-    setModalOpen(true);
-  }
-
-  function goToday() {
-    setSelectedDate(new Date());
-  }
-
-  function navigate(direction) {
-    if (view === "day") setSelectedDate((d) => addDays(d, direction));
-    else if (view === "week") setSelectedDate((d) => addDays(d, direction * 7));
-    else setSelectedDate((d) => new Date(d.getFullYear(), d.getMonth() + direction, 1));
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper text-inkfaint">
+        Loading…
+      </div>
+    );
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <Header today={today} selectedDate={selectedDate} onSignOut={signOut} />
-
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <ViewSwitcher view={view} onChange={setView} />
-        <CategoryFilter value={categoryFilter} onChange={setCategoryFilter} />
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="Previous"
-          className="rounded-md border border-line px-2.5 py-1 text-sm text-inkfaint hover:text-ink"
-        >
-          ←
-        </button>
-        <button
-          type="button"
-          onClick={goToday}
-          className="rounded-md border border-line px-3 py-1 text-sm text-inkfaint hover:text-ink"
-        >
-          Today
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate(1)}
-          aria-label="Next"
-          className="rounded-md border border-line px-2.5 py-1 text-sm text-inkfaint hover:text-ink"
-        >
-          →
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="mt-8 text-sm text-inkfaint">Loading your schedule…</p>
-      ) : (
-        <div className="mt-6">
-          {view === "day" && (
-            <DayView
-              date={selectedDate}
-              today={today}
-              blocks={dayBlocks}
-              onBlockClick={openEdit}
-              onAddClick={openCreate}
-              onToggleComplete={toggleCompletion}
-            />
-          )}
-          {view === "week" && (
-            <WeekView
-              weekDates={weekDates}
-              today={today}
-              blocksByDate={weekBlocksByDate}
-              onBlockClick={openEdit}
-              onDayClick={(date) => {
-                setSelectedDate(date);
-                setView("day");
-              }}
-              onAddClick={openCreate}
-              onToggleComplete={toggleCompletion}
-            />
-          )}
-          {view === "month" && (
-            <MonthView
-              monthDates={monthDates}
-              currentMonthDate={selectedDate}
-              today={today}
-              blocksByDate={monthBlocksByDate}
-              onDayClick={(date) => {
-                setSelectedDate(date);
-                setView("day");
-              }}
-            />
-          )}
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12 bg-webglow">
+      <div className="w-full max-w-md rounded-xl border border-line bg-surface p-6 sm:p-8 shadow-xl">
+        <div className="text-center">
+          <h1 className="font-display text-4xl text-ink tracking-wide">
+            TIMETABLE PLANNER
+          </h1>
+          <p className="mt-2 text-sm text-inkfaint">
+            {isSignUp
+              ? "Create a new account to sync your schedule across devices"
+              : "Sign in to manage your college and personal timetable"}
+          </p>
         </div>
-      )}
 
-      <BlockModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        mode={modalMode}
-        initialDate={modalInitialDate}
-        block={modalBlock}
-        onCreateRecurring={addRecurringBlock}
-        onCreateException={addException}
-        onUpdateRecurring={updateRecurringBlock}
-        onUpdateException={updateException}
-        onDeleteRecurring={deleteRecurringBlock}
-        onDeleteException={deleteException}
-        onCancelOccurrence={cancelOccurrence}
-      />
-    </main>
-  );
-}
+        {/* Tab Switcher */}
+        <div className="mt-6 flex rounded-lg border border-line bg-paper p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(false);
+              setErrorMsg("");
+              setInfoMsg("");
+            }}
+            className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
+              !isSignUp
+                ? "bg-college text-white shadow"
+                : "text-inkfaint hover:text-ink"
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(true);
+              setErrorMsg("");
+              setInfoMsg("");
+            }}
+            className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
+              isSignUp
+                ? "bg-college text-white shadow"
+                : "text-inkfaint hover:text-ink"
+            }`}
+          >
+            Sign Up
+          </button>
+        </div>
 
-export default function Page() {
-  return (
-    <AuthGuard>
-      <DashboardContent />
-    </AuthGuard>
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Info Banner */}
+        {infoMsg && (
+          <div className="mt-4 rounded-md border border-college/40 bg-college/10 p-3 text-sm text-ink">
+            {infoMsg}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium uppercase tracking-wider text-inkfaint mb-1">
+              Email Address
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-inkfaint/50 focus:border-college focus:outline-none focus:ring-1 focus:ring-college"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium uppercase tracking-wider text-inkfaint mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-inkfaint/50 focus:border-college focus:outline-none focus:ring-1 focus:ring-college"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-college py-2.5 text-sm font-semibold text-white shadow-md hover:bg-college/90 disabled:opacity-50 transition"
+          >
+            {submitting
+              ? isSignUp
+                ? "Creating account..."
+                : "Signing in..."
+              : isSignUp
+              ? "Create Account"
+              : "Sign In"}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

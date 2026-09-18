@@ -46,9 +46,23 @@ create table if not exists public.date_exceptions (
 create index if not exists idx_recurring_blocks_user_day on public.recurring_blocks (user_id, day_of_week);
 create index if not exists idx_date_exceptions_user_date on public.date_exceptions (user_id, exception_date);
 
+-- Track completed task occurrences per date
+create table if not exists public.block_completions (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  block_source text not null check (block_source in ('recurring', 'exception')),
+  block_id uuid not null,
+  completion_date date not null,
+  created_at timestamptz default now(),
+  unique (user_id, block_source, block_id, completion_date)
+);
+
+create index if not exists idx_block_completions_user_date on public.block_completions (user_id, completion_date);
+
 -- Row Level Security: every user only ever sees and edits their own rows.
 alter table public.recurring_blocks enable row level security;
 alter table public.date_exceptions enable row level security;
+alter table public.block_completions enable row level security;
 
 drop policy if exists "recurring_blocks_owner" on public.recurring_blocks;
 create policy "recurring_blocks_owner"
@@ -64,6 +78,15 @@ create policy "date_exceptions_owner"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "block_completions_owner" on public.block_completions;
+create policy "block_completions_owner"
+  on public.block_completions
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 -- Real-time updates so edits show up instantly across devices/tabs.
 alter publication supabase_realtime add table public.recurring_blocks;
 alter publication supabase_realtime add table public.date_exceptions;
+alter publication supabase_realtime add table public.block_completions;
+
