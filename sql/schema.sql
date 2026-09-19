@@ -2,91 +2,152 @@
 
 create extension if not exists "uuid-ossp";
 
--- The weekly recurring pattern: your normal college + personal timetable.
-create table if not exists public.recurring_blocks (
+-- User profiles
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  timezone text default 'UTC',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Subjects / Tracks / Projects
+create table if not exists public.subjects (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  category text not null check (category in ('college', 'personal')),
-  title text not null,
-  day_of_week int not null check (day_of_week between 0 and 6), -- 0 = Sunday ... 6 = Saturday
-  start_time time not null,
-  end_time time not null,
-  location text,
-  color text,
+  name text not null,
+  short_name text,
+  category text not null check (category in ('college', 'study', 'project')),
+  teacher text,
+  room text,
   notes text,
+  color text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Events (replaces recurring_blocks)
+create table if not exists public.events (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  subject_id uuid references public.subjects(id) on delete set null,
+  title text not null,
+  category text not null check (category in ('college', 'study', 'project', 'personal', 'exercise', 'other')),
+  start_datetime timestamptz not null,
+  end_datetime timestamptz not null,
+  description text,
+  location text,
+  recurrence_rule text, -- rrule string for recurring events
+  recurrence_end timestamptz, -- when recurrence ends
+  status text not null default 'scheduled' check (status in ('scheduled', 'completed', 'cancelled')),
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
-  check (start_time < end_time)
+  check (start_datetime < end_datetime)
 );
 
--- One-off changes for a specific calendar date: either cancel a recurring
--- block for that day, or add an ad-hoc block (e.g. personal work that needs
--- to happen during normal college hours just for that one day).
-create table if not exists public.date_exceptions (
+-- Event exceptions for recurring events (replaces date_exceptions)
+create table if not exists public.event_exceptions (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  exception_date date not null,
-  type text not null check (type in ('cancel', 'add')),
-  recurring_block_id uuid references public.recurring_blocks(id) on delete cascade,
-  category text check (category in ('college', 'personal')),
-  title text,
-  start_time time,
-  end_time time,
-  location text,
-  color text,
-  notes text,
-  created_at timestamptz default now(),
-  check (
-    (type = 'cancel' and recurring_block_id is not null)
-    or
-    (type = 'add' and title is not null and start_time is not null and end_time is not null and category is not null)
-  )
+  event_id uuid references public.events(id) on delete cascade not null,
+  occurrence_date date not null,
+  action text not null check (action in ('cancel', 'move', 'update')),
+  replacement_start timestamptz,
+  replacement_end timestamptz,
+  replacement_title text,
+  replacement_location text,
+  replacement_notes text,
+  created_at timestamptz default now()
 );
 
-create index if not exists idx_recurring_blocks_user_day on public.recurring_blocks (user_id, day_of_week);
-create index if not exists idx_date_exceptions_user_date on public.date_exceptions (user_id, exception_date);
-
--- Track completed task occurrences per date
-create table if not exists public.block_completions (
+-- Tasks
+create table if not exists public.tasks (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  block_source text not null check (block_source in ('recurring', 'exception')),
-  block_id uuid not null,
-  completion_date date not null,
+  subject_id uuid references public.subjects(id) on delete set null,
+  title text not null,
+  description text,
+  due_datetime timestamptz,
+  priority int default 0 check (priority between 0 and 3), -- 0=none, 1=low, 2=medium, 3=high
+  completed boolean default false,
+  completed_at timestamptz,
   created_at timestamptz default now(),
-  unique (user_id, block_source, block_id, completion_date)
+  updated_at timestamptz default now()
 );
 
-create index if not exists idx_block_completions_user_date on public.block_completions (user_id, completion_date);
+-- User settings
+create table if not exists public.settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  default_view text default 'today',
+  week_starts_on int default 1 check (week_starts_on between 0 and 6),
+  notification_enabled boolean default true,
+  default_reminder_minutes int default 10,
+  theme text default 'system' check (theme in ('light', 'dark', 'system')),
+  updated_at timestamptz default now()
+);
 
--- Row Level Security: every user only ever sees and edits their own rows.
-alter table public.recurring_blocks enable row level security;
-alter table public.date_exceptions enable row level security;
-alter table public.block_completions enable row level security;
+-- Indexes
+create index if not exists idx_subjects_user on public.subjects (user_id);
+create index if not exists idx_events_user_datetime on public.events (user_id, start_datetime);
+create index if not exists idx_events_user_status on public.events (user_id, status);
+create index if not exists idx_event_exceptions_user_date on public.event_exceptions (user_id, occurrence_date);
+create index if not exists idx_tasks_user_due on public.tasks (user_id, due_datetime);
+create index if not exists idx_tasks_user_completed on public.tasks (user_id, completed);
 
-drop policy if exists "recurring_blocks_owner" on public.recurring_blocks;
-create policy "recurring_blocks_owner"
-  on public.recurring_blocks
+-- Row Level Security
+alter table public.profiles enable row level security;
+alter table public.subjects enable row level security;
+alter table public.events enable row level security;
+alter table public.event_exceptions enable row level security;
+alter table public.tasks enable row level security;
+alter table public.settings enable row level security;
+
+-- Policies
+drop policy if exists "profiles_owner" on public.profiles;
+create policy "profiles_owner"
+  on public.profiles
+  for all
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+drop policy if exists "subjects_owner" on public.subjects;
+create policy "subjects_owner"
+  on public.subjects
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-drop policy if exists "date_exceptions_owner" on public.date_exceptions;
-create policy "date_exceptions_owner"
-  on public.date_exceptions
+drop policy if exists "events_owner" on public.events;
+create policy "events_owner"
+  on public.events
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-drop policy if exists "block_completions_owner" on public.block_completions;
-create policy "block_completions_owner"
-  on public.block_completions
+drop policy if exists "event_exceptions_owner" on public.event_exceptions;
+create policy "event_exceptions_owner"
+  on public.event_exceptions
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Real-time updates so edits show up instantly across devices/tabs.
-alter publication supabase_realtime add table public.recurring_blocks;
-alter publication supabase_realtime add table public.date_exceptions;
-alter publication supabase_realtime add table public.block_completions;
+drop policy if exists "tasks_owner" on public.tasks;
+create policy "tasks_owner"
+  on public.tasks
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
+drop policy if exists "settings_owner" on public.settings;
+create policy "settings_owner"
+  on public.settings
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Real-time
+alter publication supabase_realtime add table public.subjects;
+alter publication supabase_realtime add table public.events;
+alter publication supabase_realtime add table public.event_exceptions;
+alter publication supabase_realtime add table public.tasks;
+alter publication supabase_realtime add table public.settings;

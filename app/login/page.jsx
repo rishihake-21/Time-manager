@@ -1,187 +1,117 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../lib/useAuth";
 import { supabase } from "../../lib/supabaseClient";
 
 export default function LoginPage() {
-  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [infoMsg, setInfoMsg] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  // If user is already logged in, redirect to dashboard
-  useEffect(() => {
-    if (!authLoading && user) {
-      router.replace("/");
-    }
-  }, [user, authLoading, router]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setErrorMsg("");
-    setInfoMsg("");
-    setSubmitting(true);
+    setBusy(true);
+    setError(null);
+    setMessage(null);
 
-    try {
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/login`,
-          },
-        });
-
-        if (error) {
-          setErrorMsg(error.message);
-        } else if (data.user && !data.session) {
-          setInfoMsg("Account created! Please check your email to verify your account before logging in.");
-        } else if (data.session) {
-          router.replace("/");
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          setErrorMsg(error.message);
-        } else {
-          router.replace("/");
-        }
-      }
-    } catch (err) {
-      console.error("Auth error:", err);
-      setErrorMsg("An unexpected error occurred. Please try again.");
-    } finally {
-      setSubmitting(false);
+    if (mode === "signin") {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (err) setError(err.message);
+      else router.push("/");
+    } else {
+      const { error: err } = await supabase.auth.signUp({ email, password });
+      if (err) setError(err.message);
+      else
+        setMessage(
+          "Account created. Check your inbox to confirm your email, then sign in."
+        );
     }
-  }
-
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-paper text-inkfaint">
-        Loading…
-      </div>
-    );
+    setBusy(false);
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12 bg-webglow">
-      <div className="w-full max-w-md rounded-xl border border-line bg-surface p-6 sm:p-8 shadow-xl">
-        <div className="text-center">
-          <h1 className="font-display text-4xl text-ink tracking-wide">
-            TIMETABLE PLANNER
-          </h1>
-          <p className="mt-2 text-sm text-inkfaint">
-            {isSignUp
-              ? "Create a new account to sync your schedule across devices"
-              : "Sign in to manage your college and personal timetable"}
-          </p>
-        </div>
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <h1 className="font-display text-3xl font-semibold text-ink">
+          Ledger
+        </h1>
+        <p className="mt-1 text-sm text-inkfaint">
+          College and personal, on one page.
+        </p>
 
-        {/* Tab Switcher */}
-        <div className="mt-6 flex rounded-lg border border-line bg-paper p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(false);
-              setErrorMsg("");
-              setInfoMsg("");
-            }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
-              !isSignUp
-                ? "bg-college text-white shadow"
-                : "text-inkfaint hover:text-ink"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(true);
-              setErrorMsg("");
-              setInfoMsg("");
-            }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition ${
-              isSignUp
-                ? "bg-college text-white shadow"
-                : "text-inkfaint hover:text-ink"
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
-
-        {/* Error Banner */}
-        {errorMsg && (
-          <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* Info Banner */}
-        {infoMsg && (
-          <div className="mt-4 rounded-md border border-college/40 bg-college/10 p-3 text-sm text-ink">
-            {infoMsg}
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-inkfaint mb-1">
-              Email Address
+            <label htmlFor="email" className="block text-sm font-medium text-ink">
+              Email
             </label>
             <input
+              id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-inkfaint/50 focus:border-college focus:outline-none focus:ring-1 focus:ring-college"
+              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink focus-visible:outline-none"
+              placeholder="you@college.edu"
             />
           </div>
-
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-inkfaint mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-ink">
               Password
             </label>
             <input
+              id="password"
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-inkfaint/50 focus:border-college focus:outline-none focus:ring-1 focus:ring-college"
+              className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink focus-visible:outline-none"
+              placeholder="At least 6 characters"
             />
           </div>
 
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          {message && <p className="text-sm text-college">{message}</p>}
+
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-college py-2.5 text-sm font-semibold text-white shadow-md hover:bg-college/90 disabled:opacity-50 transition"
+            disabled={busy}
+            className="w-full rounded-md bg-ink px-4 py-2 font-medium text-paper transition-opacity disabled:opacity-60"
           >
-            {submitting
-              ? isSignUp
-                ? "Creating account..."
-                : "Signing in..."
-              : isSignUp
-              ? "Create Account"
-              : "Sign In"}
+            {busy
+              ? "Please wait…"
+              : mode === "signin"
+              ? "Sign in"
+              : "Create account"}
           </button>
         </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode(mode === "signin" ? "signup" : "signin");
+            setError(null);
+            setMessage(null);
+          }}
+          className="mt-4 text-sm text-inkfaint underline underline-offset-2"
+        >
+          {mode === "signin"
+            ? "New here? Create an account"
+            : "Already have an account? Sign in"}
+        </button>
       </div>
-    </div>
+    </main>
   );
 }

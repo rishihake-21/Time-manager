@@ -4,8 +4,8 @@
   "description": "Your college and personal schedule, in one place.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F1B33",
-  "theme_color": "#0F1B33",
+  "background_color": "#EEF1EF",
+  "theme_color": "#2F5D8A",
   "orientation": "portrait-primary",
   "icons": [
     {

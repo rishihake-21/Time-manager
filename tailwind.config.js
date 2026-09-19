@@ -7,30 +7,40 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        paper: "#0F1B33",
-        surface: "#16234A",
-        surfaceRaised: "#1C2C57",
-        ink: "#F3F5FA",
-        inkfaint: "#9AA7CC",
-        line: "#2B3B6B",
+        paper: "#EEF1EF",
+        surface: "#FFFFFF",
+        ink: "#1E2A26",
+        inkfaint: "#5B665F",
+        line: "#C7CCC4",
         college: {
-          DEFAULT: "#2E6BFF",
-          soft: "#1B2C63",
+          DEFAULT: "#2F5D8A",
+          soft: "#E4ECF4",
+        },
+        study: {
+          DEFAULT: "#1B7A4A",
+          soft: "#E1F3E7",
+        },
+        project: {
+          DEFAULT: "#A04A1E",
+          soft: "#F5E6DD",
         },
         personal: {
-          DEFAULT: "#EE1D25",
-          soft: "#4A1620",
+          DEFAULT: "#8A6D1E",
+          soft: "#F3ECD8",
         },
-        danger: "#FF5B5B",
-        webgold: "#FFD447",
+        exercise: {
+          DEFAULT: "#C0392B",
+          soft: "#FADBD8",
+        },
+        other: {
+          DEFAULT: "#5D6D7E",
+          soft: "#EBF5FB",
+        },
+        danger: "#A3372E",
       },
       fontFamily: {
-        display: ["'Bangers'", "system-ui", "sans-serif"],
+        serif: ["'Source Serif 4'", "Georgia", "serif"],
         sans: ["'IBM Plex Sans'", "system-ui", "sans-serif"],
-      },
-      backgroundImage: {
-        webglow:
-          "radial-gradient(circle at 50% 0%, rgba(46,107,255,0.18), transparent 60%)",
       },
     },
   },
